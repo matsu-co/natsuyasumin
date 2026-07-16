@@ -18,16 +18,7 @@
 - HTML/CSS/JavaScript が1ファイルに統合された単一ファイルゲーム
 - 進行状況はブラウザの localStorage に自動保存（日付が変わると毎日のタスクがリセット）
 - 外部ライブラリ・通信一切なし
-- RPG風ピクセルアート背景、効果音つき（🔊ボタンでオフ可）
-
-## GitHub Pages で公開する方法
-
-1. GitHub で新しいリポジトリを作成（例：`natsuyasumin`、Public を選択）
-2. このフォルダの `index.html`・`README.md`・`LICENSE` をアップロード
-   （リポジトリページの「Add file → Upload files」でドラッグ&ドロップ）
-3. リポジトリの **Settings → Pages** を開く
-4. 「Build and deployment」の Source を **Deploy from a branch**、Branch を **main / (root)** にして Save
-5. 数分後、`https://＜ユーザー名＞.github.io/natsuyasumin/` でゲームが公開されます
+- 効果音つき（🔊ボタンでオフ可）
 
 ## ⚠️ 注意事項
 
@@ -36,8 +27,8 @@
   - ブラウザの履歴・サイトデータを消すと進行もリセットされます
   - 同じ端末・同じブラウザで開かないとデータは引き継がれません
 - 公開ページでは訪問数の把握のため **Google Analytics** を利用しています（匿名のアクセス統計のみ。ゲームの入力内容や進行データは送信されません）
-- 不具合を見つけたら [Issues](../../issues) で教えてください。`index.html` 1ファイルだけなので、自分で編集して直す・カスタマイズするのも歓迎です
+- 不具合を見つけたらhtmlで自分で編集して直す・カスタマイズするのも歓迎です
 
 ## ライセンス
 
-MIT License — 自由に使って・改造して・共有してください。詳細は [LICENSE](LICENSE) を参照。
+MIT License — 自由に使って・改造してください。詳細は [LICENSE](LICENSE) を参照。
