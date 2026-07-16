@@ -65,7 +65,7 @@ body{
 /* ===== カレンダー ===== */
 .cal-head{display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:17px;}
 .cal-head #todayLabel{color:#2a9dd6;}
-.cal-strip{display:flex; gap:4px; overflow-x:auto; padding:12px 2px 6px; scrollbar-width:thin;}
+.cal-strip{display:flex; gap:4px; overflow-x:auto; padding:12px 2px 6px; scrollbar-width:thin; -webkit-overflow-scrolling:touch;}
 .day{min-width:34px; text-align:center; flex-shrink:0;}
 .day .num{font-size:13px; font-weight:700; color:#9aa7b0;}
 .day .box{
@@ -85,7 +85,41 @@ body{
 .cols{display:flex; gap:16px; align-items:flex-start;}
 .col-left{width:360px; flex-shrink:0;}
 .col-right{flex:1; min-width:0;}
-@media(max-width:900px){.cols{flex-direction:column}.col-left{width:100%}}
+/* タブレット・よこ向きスマホ：2カラムを維持して左をスリムに */
+@media(max-width:1000px) and (min-width:701px){
+  .col-left{width:300px;}
+  .task-btn{min-width:82px; padding:9px 14px; font-size:14px;}
+}
+/* たて向きスマホ：縦積み */
+@media(max-width:700px){
+  .cols{flex-direction:column}
+  .col-left{width:100%}
+  .hero h1{font-size:30px; letter-spacing:4px;}
+  .hero p{font-size:12px; letter-spacing:2px;}
+  .wrap{padding:10px;}
+  .card{padding:14px; border-radius:18px; margin-bottom:12px;}
+  .bar-label{width:104px; font-size:13px;}
+  .bar-val{width:64px; font-size:11px;}
+  .task-name{font-size:15.5px;}
+  .task-emoji{font-size:26px; width:34px;}
+}
+/* よこ向きスマホなど、たかさが低い画面：ポップアップを小さく */
+@media(max-height:560px){
+  .hero{padding:8px 10px 10px;}
+  .hero h1{font-size:24px; letter-spacing:3px; animation:none;}
+  .hero p{display:none;}
+  .icon-btn{width:38px; height:38px; font-size:17px; top:7px;}
+  .panel{padding:12px 14px;}
+  .panel h2{font-size:19px; margin:2px 0 6px; padding-bottom:4px;}
+  .panel .desc{font-size:13px; margin-bottom:6px; line-height:1.5;}
+  .big-btn{font-size:18px; padding:12px 36px; margin-top:8px; letter-spacing:2px;}
+  .stage-box{height:min(300px,56vh);}
+  .evo-stage{height:min(250px,52vh);}
+  #evoSvg{height:min(220px,44vh); width:auto;}
+  .evo-name{font-size:21px; margin-top:6px;}
+  .countdown{font-size:64px;}
+  .battle-hud{font-size:15px; margin-top:6px;}
+}
 /* ===== タスク行 ===== */
 .task-row{
   display:flex; align-items:center; gap:12px; padding:13px 4px;
@@ -171,6 +205,7 @@ body{
   width:min(760px,96vw); padding:22px; text-align:center; position:relative;
   box-shadow:0 20px 60px rgba(0,0,0,.35);
   animation:popIn .4s cubic-bezier(.2,1.6,.4,1);
+  max-height:96vh; overflow-y:auto;   /* ひくい画面でも スクロールで ぜんぶ見える */
 }
 @keyframes popIn{from{transform:scale(.6); opacity:0}to{transform:scale(1); opacity:1}}
 .panel h2{font-size:26px; margin:4px 0 10px; border:none; color:#ff7043; letter-spacing:2px;}
@@ -228,7 +263,7 @@ body{
   position:relative; height:300px; display:flex; align-items:center; justify-content:center;
   background:radial-gradient(circle at 50% 45%,#4a5a8a 0%,#232c4d 75%); border-radius:18px; overflow:hidden;
 }
-.evo-creature{transform-origin:center bottom;}
+.evo-creature{transform-origin:center bottom; max-width:88vw; max-height:100%;}
 .evo-shake{animation:evoShake .12s infinite;}
 @keyframes evoShake{0%,100%{transform:translateX(-5px) rotate(-2deg)}50%{transform:translateX(5px) rotate(2deg)}}
 .evo-flash{
@@ -300,7 +335,8 @@ body{
 .emoji-palette{
   position:fixed; z-index:850; background:#fff; border-radius:18px;
   box-shadow:0 12px 50px rgba(0,0,0,.35); padding:14px;
-  display:grid; grid-template-columns:repeat(7,46px); gap:5px;
+  display:grid; grid-template-columns:repeat(auto-fill,46px); gap:5px;
+  width:min(92vw,388px); justify-content:center;
   left:50%; top:50%; transform:translate(-50%,-50%); max-height:72vh; overflow-y:auto;
 }
 .emoji-palette button{
