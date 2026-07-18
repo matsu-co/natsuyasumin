@@ -1476,7 +1476,7 @@ function uid(p){ return p+Date.now().toString(36)+(uidCounter++); }
 function dailyRowHTML(t){
   return '<div class="setup-row" data-id="'+esc(t.id)+'">'+
     '<button class="emoji-pick">'+t.emoji+'</button>'+
-    '<input class="nm" value="'+esc(t.name)+'" maxlength="14" placeholder="タスクのなまえ">'+
+    '<input class="nm" value="'+esc(t.name)+'" maxlength="30" placeholder="タスクのなまえ">'+
     '<button class="del-btn" title="けす">✖</button></div>';
 }
 function hwModeOf(h){ return h.mode || (h.max===0?"inf":"count"); }
@@ -1485,7 +1485,7 @@ function hwRowHTML(h){
   const showNum=(mode==="count");
   return '<div class="setup-row" data-id="'+esc(h.id)+'" data-mode="'+mode+'">'+
     '<button class="emoji-pick">'+h.emoji+'</button>'+
-    '<input class="nm" value="'+esc(h.name)+'" maxlength="14" placeholder="しゅくだいのなまえ">'+
+    '<input class="nm" value="'+esc(h.name)+'" maxlength="30" placeholder="しゅくだいのなまえ">'+
     '<span class="mode-tabs">'+
       '<button class="mode-btn'+(mode==="count"?" on":"")+'" data-m="count" title="もくひょうのかずをきめる">🔢かず</button>'+
       '<button class="mode-btn'+(mode==="rough"?" on":"")+'" data-m="rough" title="かぞえられないタスクむけ">👌ざっくり</button>'+
@@ -1570,7 +1570,7 @@ function showSetup(first){
   $("#setupSave").addEventListener("click",()=>{
     S.tasksDef=[...ov.querySelectorAll("#setDaily .setup-row")].map((r,i)=>({
       id:r.dataset.id,
-      name:(r.querySelector(".nm").value.trim()||"タスク"+(i+1)).slice(0,14),
+      name:(r.querySelector(".nm").value.trim()||"タスク"+(i+1)).slice(0,30),
       emoji:r.querySelector(".emoji-pick").textContent
     }));
     S.hwDef=[...ov.querySelectorAll("#setHw .setup-row")].map((r,i)=>{
@@ -1581,7 +1581,7 @@ function showSetup(first){
       else{ mx=Math.min(999,Math.max(1,parseInt(r.querySelector(".mx").value,10)||1)); un=(r.querySelector(".un").value.trim()||"かい").slice(0,4); }
       return {
         id:r.dataset.id,
-        name:(r.querySelector(".nm").value.trim()||"しゅくだい"+(i+1)).slice(0,14),
+        name:(r.querySelector(".nm").value.trim()||"しゅくだい"+(i+1)).slice(0,30),
         emoji:r.querySelector(".emoji-pick").textContent,
         max:mx, unit:un, btn:"+1"+un, mode:mode
       };
