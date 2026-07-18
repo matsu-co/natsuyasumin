@@ -298,6 +298,8 @@ body{
 @keyframes popSeg{from{transform:scale(.2)}to{transform:scale(1)}}
 .glitter{animation:glitA 2s ease-in-out infinite;}
 @keyframes glitA{0%,100%{opacity:.2}50%{opacity:1}}
+.aura-pulse{animation:auraP 2.8s ease-in-out infinite; transform-box:fill-box; transform-origin:center;}
+@keyframes auraP{0%,100%{opacity:.55; transform:scale(1)}50%{opacity:.95; transform:scale(1.07)}}
 /* ===== タスクせってい ===== */
 .mini-track{height:8px; background:#eef2f5; border-radius:999px; overflow:hidden; margin-top:6px; max-width:200px;}
 .mini-fill{height:100%; border-radius:999px; transition:width .6s cubic-bezier(.2,.9,.3,1.2);}
@@ -466,6 +468,7 @@ const STAGES = [
   {name:"くわがた",                   min:20},
   {name:"ギラファノコギリクワガタ",   min:29},
   {name:"コーカサスオオカブト",       min:40},
+  {name:"ヘラクレスオオカブト",       min:55},
 ];
 /* タスクの量と なつやすみの長さに合わせて、進化に必要な数を自動調整する。
    宿題のカウントが多い設定でも 早々に最終形態にならず、夏休み全体で楽しめるペースにする */
@@ -475,10 +478,11 @@ function computeStages(){
   const hwSum=S.hwDef.reduce((a,h)=>a+(h.max>0?h.max:0),0);           // ♾️は除外
   const T=Math.round(0.45*daily*D + 0.7*hwSum);                       // 期待できる合計タスク数のめやす
   STAGES[1].min=5;                                                    // ふ化だけは すぐ楽しめるように固定
-  STAGES[2].min=Math.max(12,Math.round(T*0.18));
-  STAGES[3].min=Math.max(20,Math.round(T*0.35));
-  STAGES[4].min=Math.max(29,Math.round(T*0.55));
-  STAGES[5].min=Math.max(40,Math.round(T*0.80));
+  STAGES[2].min=Math.max(12,Math.round(T*0.16));
+  STAGES[3].min=Math.max(20,Math.round(T*0.30));
+  STAGES[4].min=Math.max(29,Math.round(T*0.47));
+  STAGES[5].min=Math.max(40,Math.round(T*0.66));
+  STAGES[6].min=Math.max(55,Math.round(T*0.88));
 }
 function parseYMD(s){ const p=String(s).split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
 function vacStart(){ return parseYMD(S.vacStart||"2026-07-21"); }
@@ -523,6 +527,8 @@ function load(){
       s.natsuoStageIdx = stageFor(s.natsuoSegs.length);
       if(s.natsuoStageIdx>prevRi) s.natsuoEvoAt = s.natsuoSegs.length;
     }
+    /* 移行処理：最終形態が追加される前にエンディングを見た人は、新しい最終形態でもう一度見られる */
+    if(s.finaleDone && s.stageIdx<STAGES.length-1) s.finaleDone=false;
     return s;
   }catch(e){ return defaultState(); }
 }
@@ -763,13 +769,6 @@ function addSegment(color){
     busy=true;
     setTimeout(()=>startStageUp(S.stageIdx+1),700);
   }else{
-    /* キングレベルアップのおいわい */
-    if(S.stageIdx===STAGES.length-1){
-      const k=S.segs.length-STAGES[STAGES.length-1].min;
-      if(k>0 && k%10===0){
-        setTimeout(()=>{ toast("👑 キングレベルアップ！ Lv."+(k/10+1)+"！",2400); confetti(50); SFX.win(); },1000);
-      }
-    }
     setTimeout(checkFinale,600);
   }
 }
@@ -790,12 +789,8 @@ function renderBars(){
   $("#meStageName").textContent=STAGES[idx].name;
   $("#rivStageName").textContent=STAGES[S.natsuoStageIdx].name;
   if(idx>=STAGES.length-1){
-    /* コーカサス後は「キングレベル」：10たべるごとにレベルアップして飽きさせない */
-    const base=STAGES[STAGES.length-1].min;
-    const k=Math.max(0,n-base);
-    const lv=Math.floor(k/10)+1;
-    $("#meBar").style.width=((k%10)/10*100)+"%";
-    $("#meBarVal").textContent="👑 キング Lv."+lv;
+    $("#meBar").style.width="100%";
+    $("#meBarVal").textContent="👑 さいきょう！";
   }else{
     const cur=STAGES[idx].min, nxt=STAGES[idx+1].min;
     const p=Math.max(0,Math.min(1,(n-cur)/(nxt-cur)));
@@ -841,12 +836,16 @@ function face(x,y,r,sleeping){
 function creatureSVG(stageIdx, colors, recent, gid, sleeping){
   const n=colors.length;
   const rec=(recent&&recent.length)?recent:null;
-  // 羽のデフォルト色：せみ=白、くわがた系=ノーマルな茶色、コーカサス=ただの茶色から
+  // 羽のデフォルト色：せみ=白、くわがた系=ノーマルな茶色、コーカサス/ヘラクレス=ただの茶色から
   const wingDefault = stageIdx===3?["#7a5240","#5d4037"] : stageIdx===4?["#4a332b","#3a2823"] :
-    stageIdx===5?["#5d4037","#3e2723"] : ["#ffffff","#eef6ff"];
+    stageIdx===5?["#5d4037","#3e2723"] : stageIdx===6?["#4a2c20","#2b1a12"] : ["#ffffff","#eef6ff"];
   const defs='<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="1" y2="0">'+gradStops(colors)+'</linearGradient>'+
     '<linearGradient id="'+gid+'v" x1="0" y1="0" x2="0" y2="1">'+gradStops(colors)+'</linearGradient>'+
-    '<linearGradient id="'+gid+'w" x1="0" y1="0" x2="0" y2="1">'+gradStops(rec||wingDefault)+'</linearGradient></defs>';
+    '<linearGradient id="'+gid+'w" x1="0" y1="0" x2="0" y2="1">'+gradStops(rec||wingDefault)+'</linearGradient>'+
+    '<radialGradient id="'+gid+'au" cx="50%" cy="50%" r="50%">'+
+      '<stop offset="0%" stop-color="#ffec9e" stop-opacity=".85"/>'+
+      '<stop offset="55%" stop-color="#ffd93d" stop-opacity=".32"/>'+
+      '<stop offset="100%" stop-color="#ffd93d" stop-opacity="0"/></radialGradient></defs>';
   let body="";
   if(stageIdx===0){ /* たまご */
     body='<g class="sway"><ellipse cx="0" cy="-45" rx="42" ry="52" fill="#fffef5" stroke="#e8ddc8" stroke-width="4"/>'+
@@ -894,11 +893,11 @@ function creatureSVG(stageIdx, colors, recent, gid, sleeping){
       '<circle cx="-16" cy="-113" r="4" fill="#ffb0b8"/><circle cx="16" cy="-113" r="4" fill="#ffb0b8"/>'+
       face(0,-74,13,sleeping)+
       '</g>';
-  }else{ /* くわがた系（3,4,5） */
-    const sc=1+Math.min(n,45)*0.012;
-    const bodyCol = stageIdx===3?"#5d4037" : stageIdx===4?"#4e342e" : "#3e2723";
-    const caucasus = stageIdx===5;
-    /* コーカサスは体ぜんぶグラデ（進化直後はただの茶色→たべた色でハデに）、それ以外は羽だけグラデ */
+  }else{ /* くわがた系（3,4,5,6） */
+    const hercules = stageIdx===6;
+    const sc=(1+Math.min(n,45)*0.012)*(hercules?1.08:1);
+    const bodyCol = stageIdx===3?"#5d4037" : stageIdx===4?"#4e342e" : stageIdx===5?"#3e2723" : "#2d1a12";
+    const caucasus = stageIdx>=5;   // キング級は体ぜんぶグラデ（進化直後はただの茶色→たべた色でハデに）
     const hornFill = caucasus ? 'url(#'+gid+'w)' : bodyCol;
     const elytraFill = 'url(#'+gid+'w)';
     let horns="";
@@ -910,17 +909,36 @@ function creatureSVG(stageIdx, colors, recent, gid, sleeping){
       horns='<path d="M-14 -110 C -34 -150 -36 -200 -14 -238 C -26 -196 -18 -160 -4 -130" fill="'+hornFill+'" stroke="#211712" stroke-width="3"/>'+
         '<path d="M14 -110 C 34 -150 36 -200 14 -238 C 26 -196 18 -160 4 -130" fill="'+hornFill+'" stroke="#211712" stroke-width="3"/>'+
         '<path d="M-24 -150 l8 4 M-28 -175 l8 4 M-27 -200 l8 4 M-22 -222 l7 5 M24 -150 l-8 4 M28 -175 l-8 4 M27 -200 l-8 4 M22 -222 l-7 5" stroke="#211712" stroke-width="3" stroke-linecap="round"/>';
-    }else{ /* コーカサス：3本ヅノ */
+    }else if(stageIdx===5){ /* コーカサス：3本ヅノ */
       horns='<path d="M0 -112 C -6 -150 -4 -190 14 -222 C 18 -216 20 -208 18 -198 C 8 -168 8 -140 10 -116 Z" fill="'+hornFill+'" stroke="#1a110d" stroke-width="3"/>'+
         '<path d="M-30 -100 C -46 -130 -50 -158 -38 -180 C -40 -152 -32 -128 -20 -106 Z" fill="'+hornFill+'" stroke="#1a110d" stroke-width="3"/>'+
         '<path d="M30 -100 C 46 -130 50 -158 38 -180 C 40 -152 32 -128 20 -106 Z" fill="'+hornFill+'" stroke="#1a110d" stroke-width="3"/>';
+    }else{ /* ヘラクレス：前方へ大きくスイングする、鋭くとがった上下ヅノ（本物の噛み合うシルエット） */
+      horns=
+        /* 胸ヅノ：先端が1点に鋭くとがる長いカーブ＋上面にトゲ */
+        '<path d="M-12 -98 C -24 -152 -8 -204 58 -248 C 30 -200 18 -152 14 -102 Z" fill="'+hornFill+'" stroke="#160c07" stroke-width="3.5" stroke-linejoin="round"/>'+
+        '<path d="M-6 -172 L -17 -186 L -2 -182 Z M4 -202 L -5 -218 L 10 -210 Z M24 -228 L 20 -246 L 34 -236 Z" fill="'+hornFill+'" stroke="#160c07" stroke-width="2.5" stroke-linejoin="round"/>'+
+        /* 頭ヅノ：下から前方へ、これも鋭い1点とがり */
+        '<path d="M-2 -100 C 14 -126 38 -144 74 -150 C 48 -134 30 -118 20 -100 Z" fill="'+hornFill+'" stroke="#160c07" stroke-width="3.5" stroke-linejoin="round"/>'+
+        '<path d="M30 -132 L 40 -144 L 42 -130 Z" fill="'+hornFill+'" stroke="#160c07" stroke-width="2.5" stroke-linejoin="round"/>'+
+        '<path d="M-9 -146 C -14 -184 2 -216 44 -240" stroke="rgba(255,255,255,.45)" stroke-width="4" fill="none" stroke-linecap="round"/>';
     }
     const legs='<path d="M-40 -50 L -66 -30 L -72 -8 M-34 -34 L -60 -18 L -64 -2 M40 -50 L 66 -30 L 72 -8 M34 -34 L 60 -18 L 64 -2" stroke="'+bodyCol+'" stroke-width="7" fill="none" stroke-linecap="round"/>';
-    body='<g transform="scale('+sc+')">'+horns+legs+
+    /* ヘラクレスは 金色のオーラをまとう */
+    const aura = hercules ? '<ellipse cx="0" cy="-110" rx="115" ry="140" fill="url(#'+gid+'au)" class="aura-pulse"/>' : "";
+    body='<g transform="scale('+sc+')">'+aura+horns+legs+
       /* むね（ボディはノーマル色のまま） */
       '<ellipse cx="0" cy="-88" rx="36" ry="24" fill="'+(caucasus?'url(#'+gid+'w)':bodyCol)+'" stroke="#1f1712" stroke-width="3.5"/>'+
       /* 前ばね（ここがグラデで染まる） */
       '<ellipse cx="0" cy="-44" rx="44" ry="44" fill="'+elytraFill+'" stroke="#1f1712" stroke-width="3.5"/>'+
+      /* ヘラクレスだけの、ながれる曲線のスペシャル模様 */
+      (hercules
+        ?'<g opacity=".6" stroke="url(#'+gid+')" fill="none" stroke-width="3.5" stroke-linecap="round">'+
+          '<path d="M-32 -66 Q 0 -46 32 -66"/><path d="M-37 -46 Q 0 -22 37 -46"/><path d="M-30 -26 Q 0 -6 30 -26"/>'+
+          '<path d="M-16 -76 q 14 -14 34 -6"/></g>'+
+         '<g opacity=".55" stroke="rgba(255,255,255,.85)" fill="none" stroke-width="2" stroke-linecap="round">'+
+          '<path d="M-26 -58 Q 0 -40 26 -58"/><path d="M-31 -38 Q 0 -16 31 -38"/><path d="M-22 -70 q 12 -10 28 -5"/></g>'
+        :"")+
       '<path d="M0 -86 L 0 -4" stroke="#1f1712" stroke-width="2.5" opacity=".7"/>'+
       '<ellipse cx="-16" cy="-58" rx="12" ry="18" fill="rgba(255,255,255,'+(caucasus?'.5':'.3')+')" transform="rotate(-18 -16 -58)"/>'+
       (caucasus?'<ellipse cx="20" cy="-34" rx="8" ry="12" fill="rgba(255,255,255,.4)" transform="rotate(20 20 -34)"/>':"")+
@@ -931,11 +949,21 @@ function creatureSVG(stageIdx, colors, recent, gid, sleeping){
         : '<circle cx="-11" cy="-106" r="5" fill="#fff"/><circle cx="11" cy="-106" r="5" fill="#fff"/>'+
           '<circle cx="-10" cy="-105" r="2.5" fill="#333"/><circle cx="12" cy="-105" r="2.5" fill="#333"/>')+
       '<path d="M-5 -96 q 5 4 10 0" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>'+
-      (caucasus && rec
+      (hercules
+        /* あたまの上に金の王冠 */
+        ?'<path d="M-24 -114 L -24 -136 L -12 -123 L 0 -142 L 12 -123 L 24 -136 L 24 -114 Z" fill="#ffd93d" stroke="#b8860b" stroke-width="2.5" stroke-linejoin="round"/>'+
+         '<rect x="-24" y="-117" width="48" height="5" fill="#ffca28" stroke="#b8860b" stroke-width="1.5"/>'+
+         '<circle cx="-12" cy="-121" r="2.6" fill="#e2574c"/><circle cx="0" cy="-124" r="2.6" fill="#4aa3ff"/><circle cx="12" cy="-121" r="2.6" fill="#7bc86c"/>'+
+         '<circle cx="0" cy="-144" r="3" fill="#ffe985" stroke="#b8860b" stroke-width="1.5"/>'+
+         '<text x="34" y="-142" font-size="26" class="glitter">✨</text>'+
+         '<text x="-64" y="-92" font-size="22" class="glitter" style="animation-delay:.5s">🌟</text>'+
+         '<text x="42" y="-18" font-size="20" class="glitter" style="animation-delay:1s">✨</text>'+
+         '<text x="-36" y="-200" font-size="22" class="glitter" style="animation-delay:1.5s">⚡</text>'
+        :(caucasus && rec
         ?'<text x="30" y="-130" font-size="24" class="glitter">✨</text>'+
          '<text x="-56" y="-70" font-size="20" class="glitter" style="animation-delay:.7s">✨</text>'+
          '<text x="34" y="-10" font-size="18" class="glitter" style="animation-delay:1.3s">✨</text>'
-        :"")+
+        :""))+
       '</g>';
   }
   return defs+body;
@@ -1060,7 +1088,7 @@ function renderScene(popNew){
 }
 function natsuoHeadY(){
   const i=S.natsuoStageIdx;
-  return i===0?100 : i===1?90 : i===2?110 : i===4?250 : i===5?230 : 190;
+  return i===0?100 : i===1?90 : i===2?110 : i===4?250 : i===5?230 : i===6?285 : 190;
 }
 function creatureScreenPos(){
   const r=$("#scene").getBoundingClientRect();
@@ -1617,6 +1645,7 @@ $("#helpBtn").addEventListener("click",()=>{
 document.addEventListener("pointerdown",function initAudio(){ ac(); document.removeEventListener("pointerdown",initAudio); });
 renderCalendar(); renderTasks(); renderBars(); renderScene();
 checkMoreStageUp();
+setTimeout(checkFinale,1500);   // 条件がそろったまま閉じていた場合、起動時にもエンディング判定
 if(!S.setupDone) showSetup(true);
 window.addEventListener("resize",()=>renderScene());
 
