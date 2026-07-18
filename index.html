@@ -451,6 +451,23 @@ footer{height:60px;}
 const $ = s => document.querySelector(s);
 const KEY = "natsuyasumin_v4";
 
+/* ---------- プレイヤープロファイル（きょうだい対応） ----------
+   既存プレイヤーは自動的に「きみ」(p1)になり、データは今までのキーのまま（こわさない）。
+   追加プレイヤーは別キーに保存され、それぞれ独立して遊べる */
+const PKEY = "natsuyasumin_profiles";
+function loadProfiles(){
+  try{
+    const raw=localStorage.getItem(PKEY);
+    if(raw){ const p=JSON.parse(raw); if(p && p.list && p.list.length) return p; }
+  }catch(e){}
+  return {list:[{id:"p1",name:"きみ"}], activeId:"p1"};
+}
+let PROFILES=loadProfiles();
+function saveProfiles(){ try{ localStorage.setItem(PKEY, JSON.stringify(PROFILES)); }catch(e){} }
+function activeProfile(){ return PROFILES.list.find(p=>p.id===PROFILES.activeId)||PROFILES.list[0]; }
+function dataKey(){ const id=activeProfile().id; return id==="p1" ? KEY : KEY+"_"+id; }
+function pName(){ return activeProfile().name||"きみ"; }
+
 const EMOJI_COLORS={
   "🍉":"#ff6b81","🍋":"#ffd93d","🫐":"#5f7cff","🌻":"#ff9f43","🍧":"#4dd0e1","🍇":"#9c6ade","🍑":"#ff8fab","🥝":"#7bc86c",
   "🍎":"#e74c3c","🍊":"#ff8c42","🍓":"#ff5b7f","🍌":"#ffe066","🌽":"#ffd23f","🍅":"#ff6347","🥕":"#ff7f2a","🍈":"#a8d861",
@@ -515,7 +532,7 @@ function defaultState(){
 }
 function load(){
   try{
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(dataKey());
     if(!raw) return defaultState();
     const s = Object.assign(defaultState(), JSON.parse(raw));
     if(s.day !== todayStr()){           // あたらしい日：デイリータスクをリセット
@@ -532,7 +549,7 @@ function load(){
     return s;
   }catch(e){ return defaultState(); }
 }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function save(){ try{ localStorage.setItem(dataKey(), JSON.stringify(S)); }catch(e){} }
 function stageFor(n){ let idx=0; STAGES.forEach((st,i)=>{ if(n>=st.min) idx=i; }); return idx; }
 function natsuoColor(){ const c=["#9ccc65","#7cb342","#aed581","#c5e1a5","#8bc34a"]; return c[Math.floor(Math.random()*c.length)]; }
 
@@ -803,13 +820,14 @@ function renderBars(){
     const cur=STAGES[ri].min, nxt=STAGES[ri+1].min;
     $("#rivBar").style.width=(Math.max(0,Math.min(1,(rn-cur)/(nxt-cur)))*100)+"%";
   }
-  $("#scoreStrip").textContent="🏆 きみ "+S.score.me+" - "+S.score.riv+" なつお";
+  $("#scoreStrip").textContent="🏆 "+pName()+" "+S.score.me+" - "+S.score.riv+" なつお";
+  document.querySelector(".chip.me").textContent=pName();
 }
 
 /* ---------- リセット ---------- */
 $("#resetBtn").addEventListener("click",()=>{
-  if(confirm("さいしょから やりなおしますか？（データが きえます）")){
-    localStorage.removeItem(KEY); location.reload();
+  if(confirm("「"+pName()+"」のデータを さいしょから やりなおしますか？（このプレイヤーのデータだけ きえます）")){
+    localStorage.removeItem(dataKey()); location.reload();
   }
 });
 
@@ -1179,7 +1197,7 @@ function showBattleIntro(type, battleNo, newIdx){
       ?'なつお「え、もういっかい やるの…？ もう ねむいんだけど…」<br>ねむそうな いまが チャンス！こんどこそ かとう！'
       :'レベルアップのちからだめし！なつおが「やるときは やるよ〜」と おきてきた！<br>'+m.desc)+'</div>'+
     '<div style="display:flex;justify-content:center;gap:40px;align-items:flex-end;margin:6px 0;">'+
-      '<div>'+miniMe("gBm",110)+'<div style="font-weight:900;color:#e2574c">きみ</div></div>'+
+      '<div>'+miniMe("gBm",110)+'<div style="font-weight:900;color:#e2574c">'+esc(pName())+'</div></div>'+
       '<div style="font-size:30px;font-weight:900;color:#ff9f43;padding-bottom:30px;">VS</div>'+
       '<div>'+miniRiv("gBn",110)+'<div style="font-weight:900;color:#7b6cd9">なつお</div></div>'+
     '</div>'+
@@ -1269,7 +1287,7 @@ function runLeaf(battleNo,newIdx){
       '<div class="runner" style="left:6%;bottom:4px;">'+miniMe("gLm",90)+'</div>'+
       '<div class="runner" id="lRiv" style="right:6%;bottom:4px;">'+miniRiv("gLr",90)+'</div>'+
     '</div>'+
-    '<div class="battle-hud"><span class="me">きみ：<span id="cMe">0</span> まい</span><span class="riv">なつお：<span id="cRiv">0</span> まい</span></div></div>';
+    '<div class="battle-hud"><span class="me">'+esc(pName())+'：<span id="cMe">0</span> まい</span><span class="riv">なつお：<span id="cRiv">0</span> まい</span></div></div>';
   const box=$("#btlBox");
   let me=0, riv=0, spawned=0, resolved=0;
   const TOTAL=12;
@@ -1321,7 +1339,7 @@ function runJump(battleNo,newIdx){
       '<div class="runner" id="jMe" style="left:12%;top:10%;transition:transform .28s cubic-bezier(.3,1.4,.6,1);"><div class="run-anim">'+miniMe("gJm",80)+'</div></div>'+
       '<div class="runner" id="jRiv" style="left:12%;top:56%;transition:transform .28s cubic-bezier(.3,1.4,.6,1);"><div class="run-anim">'+miniRiv("gJr",80)+'</div></div>'+
     '</div>'+
-    '<div class="battle-hud"><span class="me">きみ：<span id="cMe">0</span> かい</span><span class="riv">なつお：<span id="cRiv">0</span> かい</span></div>'+
+    '<div class="battle-hud"><span class="me">'+esc(pName())+'：<span id="cMe">0</span> かい</span><span class="riv">なつお：<span id="cRiv">0</span> かい</span></div>'+
     '<button class="big-btn blue" id="jumpBtn">ジャンプ！</button></div>';
   const box=$("#btlBox"), meEl=$("#jMe"), rivEl=$("#jRiv"), btn=$("#jumpBtn");
   let meAir=false, meClear=0, rivClear=0, wave=0;
@@ -1530,9 +1548,19 @@ function closeEmojiPalette(){ const p=$("#emojiPal"); if(p) p.remove(); document
 function showSetup(first){
   if(busy) return;
   const ov=$("#overlay"); ov.classList.remove("hidden");
+  const tabs=PROFILES.list.map(p=>
+    '<span style="display:inline-flex;align-items:center;gap:2px;">'+
+    '<button class="mode-btn'+(p.id===PROFILES.activeId?" on":"")+'" data-pid="'+esc(p.id)+'">'+esc(p.name)+'</button>'+
+    (PROFILES.list.length>1?'<button class="del-btn" data-pdel="'+esc(p.id)+'" style="width:24px;height:24px;font-size:11px;">✖</button>':"")+
+    '</span>').join("");
   ov.innerHTML='<div class="panel scrolly"><h2>⚙️ タスクせってい</h2>'+
     '<div class="desc">'+(first?"はじめまして！まいにち がんばるタスクを きめよう！<br>":"")+
     'えもじを タップすると <b>すきな えもじを えらべる</b>よ！タスクは じゆうに ふやせる・けせるよ。</div>'+
+    '<div class="setup-h">👤 プレイヤー</div>'+
+    '<div class="setup-row"><span style="font-weight:800;font-size:14px;">なまえ</span>'+
+      '<input id="pNameIn" value="'+esc(pName())+'" maxlength="10" style="max-width:160px;">'+tabs+
+      '<button class="add-btn" id="addProfile" style="width:auto;padding:8px 14px;margin:0;">＋ きょうだいを ついか</button></div>'+
+    '<div style="font-size:11.5px;color:#8b95a0;text-align:left;line-height:1.6;">なまえボタンで プレイヤーを きりかえ。データは それぞれ べつに ほぞんされるよ</div>'+
     '<div class="setup-h">🗓️ なつやすみの きかん</div>'+
     '<div class="setup-row">'+
       '<span style="font-weight:800;font-size:14px;">はじまり</span>'+
@@ -1555,7 +1583,26 @@ function showSetup(first){
     '<button class="big-btn" id="setupSave">これで スタート！</button></div>';
   ov.addEventListener("click",function handler(e){
     const row=e.target.closest(".setup-row");
-    if(e.target.classList.contains("emoji-pick")){ openEmojiPalette(e.target); e.stopPropagation(); }
+    if(e.target.dataset.pdel){
+      /* プレイヤーをけす（さいご1人はけせない） */
+      const pid=e.target.dataset.pdel;
+      const p=PROFILES.list.find(x=>x.id===pid);
+      if(PROFILES.list.length<=1) return;
+      if(!confirm("プレイヤー「"+p.name+"」と そのデータを けしますか？（もとにもどせません）")) return;
+      localStorage.removeItem(pid==="p1"?KEY:KEY+"_"+pid);
+      PROFILES.list=PROFILES.list.filter(x=>x.id!==pid);
+      if(PROFILES.activeId===pid) PROFILES.activeId=PROFILES.list[0].id;
+      saveProfiles(); location.reload();
+    }
+    else if(e.target.dataset.pid){
+      /* プレイヤーきりかえ */
+      const pid=e.target.dataset.pid;
+      if(pid===PROFILES.activeId) return;
+      const nm=$("#pNameIn").value.trim();
+      if(nm) activeProfile().name=nm.slice(0,10);   // いまの名前は保存してから
+      PROFILES.activeId=pid; saveProfiles(); location.reload();
+    }
+    else if(e.target.classList.contains("emoji-pick")){ openEmojiPalette(e.target); e.stopPropagation(); }
     else if(e.target.classList.contains("del-btn")){
       const box=row.parentElement;
       if(box.children.length>1){ row.remove(); SFX.tick(); }
@@ -1581,6 +1628,17 @@ function showSetup(first){
     SFX.pop();
   });
   $("#openHelp").addEventListener("click",()=>showHelp(true));
+  $("#addProfile").addEventListener("click",()=>{
+    if(PROFILES.list.length>=6){ toast("プレイヤーは 6人まで！",1500); return; }
+    const nm=prompt("あたらしい プレイヤーの なまえは？");
+    if(!nm || !nm.trim()) return;
+    const cur=$("#pNameIn").value.trim();
+    if(cur) activeProfile().name=cur.slice(0,10);
+    const id="p"+Date.now().toString(36);
+    PROFILES.list.push({id:id, name:nm.trim().slice(0,10)});
+    PROFILES.activeId=id;
+    saveProfiles(); location.reload();   // 新プレイヤーはまっさらな状態でスタート
+  });
   $("#setupSave").addEventListener("click",()=>{
     S.tasksDef=[...ov.querySelectorAll("#setDaily .setup-row")].map((r,i)=>({
       id:r.dataset.id,
@@ -1606,9 +1664,12 @@ function showSetup(first){
     if(/^\d{4}-\d{2}-\d{2}$/.test(vs)) S.vacStart=vs;
     if(/^\d{4}-\d{2}-\d{2}$/.test(ve)) S.vacEnd=ve;
     if(parseYMD(S.vacEnd)<parseYMD(S.vacStart)) S.vacEnd=S.vacStart;
+    const nm=$("#pNameIn").value.trim();
+    if(nm) activeProfile().name=nm.slice(0,10);
+    saveProfiles();
     S.setupDone=true; save();
     computeStages();   // タスク量にあわせて進化ペースを再計算
-    renderTasks(); renderCalendar(); renderBars(); SFX.pop(); closeEmojiPalette();
+    renderTasks(); renderCalendar(); renderBars(); renderScene(); SFX.pop(); closeEmojiPalette();
     ov.classList.add("hidden"); ov.innerHTML="";
     if(first) setTimeout(()=>toast("🥚 タスクをやって たまごを そだてよう！",3000),400);
   });
@@ -1637,6 +1698,7 @@ function showHelp(fromSetup){
     'さいごまで そだてて しゅくだいも ぜんぶ おわらせると…🎆 ひみつの おまつりが まってるよ！</div>'+
     '<div class="help-block" style="background:#f4fbff;">🏠 <b>おうちの方へ</b><br>'+
     '・タスクの名前・絵文字・目標数・夏休みの期間は ⚙️ボタンでいつでも変更できます<br>'+
+    '・ごきょうだいがいる場合は ⚙️の「プレイヤー」で追加できます。名前ボタンで切り替え、データはそれぞれ別に保存されます<br>'+
     '・宿題は3タイプ：🔢数を決める（目標数と単位でカウント）／👌ざっくり（ページ数が数えられないプリント集などに。やった日に「やった！」、終わったら「✅ぜんぶおわった」で完了。回数は全体%には入りません）／♾️無限（終わりのないもの）<br>'+
     '・進化のペースはタスクの量と期間から自動調整されます<br>'+
     '・データはこの端末のブラウザ内にのみ保存されます（閲覧データを削除すると消えます）。<b>ブックマークして同じブラウザで開く</b>のがおすすめです<br>'+
