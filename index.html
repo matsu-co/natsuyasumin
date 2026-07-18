@@ -317,11 +317,22 @@ body{
 .setup-row input.mx{flex:none; width:70px; text-align:center; padding:11px 6px;}
 .setup-row input.mx:disabled{background:#f0f4f7; color:#b6c2cb;}
 .setup-row input.un{flex:none; width:70px; text-align:center; padding:11px 6px;}
-.inf-btn{
-  border:2px solid #dfe8ee; background:#fff; font-size:19px; border-radius:12px;
-  width:44px; height:44px; cursor:pointer; flex-shrink:0; filter:grayscale(1); opacity:.55;
+.mode-tabs{display:flex; gap:4px; flex-shrink:0;}
+.mode-btn{
+  border:2px solid #dfe8ee; background:#fff; font-size:12px; font-weight:800; font-family:inherit;
+  color:#5d6b78; border-radius:10px; padding:0 8px; height:38px; cursor:pointer; flex-shrink:0; opacity:.5;
+  white-space:nowrap;
 }
-.inf-btn.on{border-color:#57b9ff; background:#e5f4ff; filter:none; opacity:1;}
+.mode-btn.on{border-color:#57b9ff; background:#e5f4ff; opacity:1; color:#2a9dd6;}
+.hw-total{margin-top:14px; padding-top:12px; border-top:2px dashed #e3edf3;}
+.hw-total-label{font-weight:800; font-size:14.5px; color:#5d6b78; margin-bottom:6px;}
+.hw-total-label b{color:#ff8a3d; font-size:17px;}
+.mini-track.big{max-width:none; height:13px;}
+.help-block{
+  background:#fff; border-radius:14px; padding:12px 14px; margin:8px 0;
+  font-size:14px; line-height:1.8; text-align:left; color:#4a5560;
+}
+.help-block b{color:#ff8a3d;}
 .del-btn{
   border:none; background:#ffe9ec; color:#e2574c; font-size:14px; font-weight:900;
   border-radius:10px; width:34px; height:34px; cursor:pointer; flex-shrink:0;
@@ -375,6 +386,7 @@ footer{height:60px;}
   <p>なつやすみ そだてバトル</p>
   <button id="muteBtn" class="icon-btn" title="おと">🔊</button>
   <button id="setupBtn" class="icon-btn" style="right:70px" title="タスクせってい">⚙️</button>
+  <button id="helpBtn" class="icon-btn" style="right:124px" title="あそびかた">❓</button>
 </header>
 
 <main class="wrap">
@@ -455,6 +467,19 @@ const STAGES = [
   {name:"ギラファノコギリクワガタ",   min:29},
   {name:"コーカサスオオカブト",       min:40},
 ];
+/* タスクの量と なつやすみの長さに合わせて、進化に必要な数を自動調整する。
+   宿題のカウントが多い設定でも 早々に最終形態にならず、夏休み全体で楽しめるペースにする */
+function computeStages(){
+  const D=Math.max(7,Math.round((vacEnd()-vacStart())/86400000)+1);   // 休みの日数
+  const daily=S.tasksDef.length;
+  const hwSum=S.hwDef.reduce((a,h)=>a+(h.max>0?h.max:0),0);           // ♾️は除外
+  const T=Math.round(0.45*daily*D + 0.7*hwSum);                       // 期待できる合計タスク数のめやす
+  STAGES[1].min=5;                                                    // ふ化だけは すぐ楽しめるように固定
+  STAGES[2].min=Math.max(12,Math.round(T*0.18));
+  STAGES[3].min=Math.max(20,Math.round(T*0.35));
+  STAGES[4].min=Math.max(29,Math.round(T*0.55));
+  STAGES[5].min=Math.max(40,Math.round(T*0.80));
+}
 function parseYMD(s){ const p=String(s).split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
 function vacStart(){ return parseYMD(S.vacStart||"2026-07-21"); }
 function vacEnd(){ const e=parseYMD(S.vacEnd||"2026-08-31"); return e<vacStart()?vacStart():e; }
@@ -473,13 +498,14 @@ function defaultState(){
     ],
     hwDef:[
       {id:"drill",  name:"なつやすみドリル", emoji:"🍇", max:20, unit:"ページ", btn:"+1ページ"},
-      {id:"kenkyu", name:"じゆうけんきゅう", emoji:"🍑", max:5,  unit:"かい",   btn:"+1かい"},
+      {id:"kenkyu", name:"じゆうけんきゅう", emoji:"🍑", max:1,  unit:"かい",   btn:"+1かい"},
       {id:"dokusho",name:"どくしょ",         emoji:"🥝", max:0,  unit:"さつ",   btn:"+1さつ"},   /* max 0 = むげん */
     ],
     segs:[], stageIdx:0, evoAt:0,
     natsuoSegs:[], natsuoStageIdx:0, natsuoEvoAt:0,
     score:{me:0,riv:0}, battles:0,
     stamps:{}, muted:false, setupDone:false, finaleDone:false,
+    hwFin:{},   // ざっくりモードの「ぜんぶおわった」フラグ
     vacStart:"2026-07-21", vacEnd:"2026-08-31"
   };
 }
@@ -505,6 +531,7 @@ function stageFor(n){ let idx=0; STAGES.forEach((st,i)=>{ if(n>=st.min) idx=i; }
 function natsuoColor(){ const c=["#9ccc65","#7cb342","#aed581","#c5e1a5","#8bc34a"]; return c[Math.floor(Math.random()*c.length)]; }
 
 let S = load();
+computeStages();
 
 /* ---------- サウンド ---------- */
 let actx = null;
@@ -607,22 +634,61 @@ function renderTasks(){
   const hw=$("#hwList"); hw.innerHTML="";
   S.hwDef.forEach(h=>{
     const v=S.hw[h.id]||0;
-    const unlimited=(h.max===0);
-    const done=!unlimited && v>=h.max;
+    const mode=hwModeOf(h);
+    const done = mode==="count" ? v>=h.max : mode==="rough" ? !!S.hwFin[h.id] : false;
     const row=document.createElement("div");
     row.className="task-row"+(done?" finished":"");
-    const sub = unlimited ? v+" "+esc(h.unit)+"（♾️むげん）" : v+" / "+h.max+" "+esc(h.unit)+(done?"　ぜんぶできた！🎉":"");
-    const bar = unlimited ? "" :
-      '<div class="mini-track"><div class="mini-fill" style="width:'+Math.min(100,Math.round(v/h.max*100))+'%;background:'+colorOf(h.emoji)+'"></div></div>';
+    let sub, btnLabel, barPct=null;
+    if(mode==="inf"){
+      sub=v+" "+esc(h.unit)+"（♾️むげん）"; btnLabel="+1"+h.unit;
+    }else if(mode==="rough"){
+      sub=done?"ぜんぶできた！🎉":(v>0?v+"かい がんばった":"やったら おそう");
+      btnLabel="やった！";
+      barPct=done?100:null;   // ざっくりはバーなし（✅で100%だけ表示）
+    }else{
+      sub=v+" / "+h.max+" "+esc(h.unit)+(done?"　ぜんぶできた！🎉":"");
+      btnLabel="+1"+h.unit;
+      barPct=Math.min(100,Math.round(v/h.max*100));
+    }
+    const bar = barPct===null ? "" :
+      '<div class="mini-track"><div class="mini-fill" style="width:'+barPct+'%;background:'+colorOf(h.emoji)+'"></div></div>';
     row.innerHTML='<div class="task-emoji">'+h.emoji+'</div>'+
       '<div class="task-info"><div class="task-name">'+esc(h.name)+'</div><div class="task-sub">'+sub+'</div>'+bar+'</div>';
     const btn=document.createElement("button");
     btn.className="task-btn"+(done?" done":"");
     btn.style.background=colorOf(h.emoji);
-    btn.textContent=done?"かんりょう":("+1"+h.unit);
+    btn.textContent=done?"かんりょう":btnLabel;
     if(!done) btn.addEventListener("click",()=>completeHomework(h,btn));
-    row.appendChild(btn); hw.appendChild(row);
+    if(mode==="rough" && !done){
+      const wrap=document.createElement("div");
+      wrap.style.cssText="display:flex;flex-direction:column;gap:5px;align-items:stretch;";
+      wrap.appendChild(btn);
+      const fbtn=document.createElement("button");
+      fbtn.className="task-btn";
+      fbtn.style.cssText="background:#7bc86c;font-size:12px;padding:6px 10px;min-width:0;";
+      fbtn.textContent="✅ ぜんぶおわった";
+      fbtn.addEventListener("click",()=>finishRough(h));
+      wrap.appendChild(fbtn);
+      row.appendChild(wrap);
+    }else{
+      row.appendChild(btn);
+    }
+    hw.appendChild(row);
   });
+  /* しゅくだい ぜんたいの進捗バー（♾️は除く） */
+  const fin=S.hwDef.filter(h=>hwModeOf(h)!=="inf");
+  if(fin.length){
+    let sum=0, mx=0;
+    fin.forEach(h=>{
+      /* ざっくりは「やった！」の回数では動かず、✅で満点ぶんが加算される */
+      if(hwModeOf(h)==="rough"){ mx+=10; sum+= S.hwFin[h.id]?10:0; }
+      else{ mx+=h.max; sum+=Math.min(S.hw[h.id]||0,h.max); }
+    });
+    const pct=Math.round(sum/mx*100);
+    hw.insertAdjacentHTML("beforeend",
+      '<div class="hw-total"><div class="hw-total-label">📚 しゅくだい ぜんたい <b>'+pct+'%</b>'+(pct>=100?"　コンプリート！🎉":"")+'</div>'+
+      '<div class="mini-track big"><div class="mini-fill" style="width:'+pct+'%;background:linear-gradient(90deg,#ffd93d,#ff9f43,#ff5b7f)"></div></div></div>');
+  }
 }
 
 function completeDaily(t,btn){
@@ -636,10 +702,19 @@ function completeDaily(t,btn){
   save(); renderTasks();
 }
 function completeHomework(h,btn){
-  if(h.max!==0 && S.hw[h.id]>=h.max) return;
+  const mode=hwModeOf(h);
+  if(mode==="count" && S.hw[h.id]>=h.max) return;
+  if(mode==="rough" && S.hwFin[h.id]) return;
   S.hw[h.id]=(S.hw[h.id]||0)+1;
   eatFood(h.emoji, colorOf(h.emoji), btn);
   save(); renderTasks();
+}
+function finishRough(h){
+  if(S.hwFin[h.id]) return;
+  if(!confirm("「"+h.name+"」は ほんとうに ぜんぶ おわった？")) return;   // おしまちがい防止
+  S.hwFin[h.id]=true; save(); renderTasks();
+  toast("🎉 「"+h.name+"」ぜんぶ おわった！すごい！！",2600); confetti(60); SFX.win();
+  setTimeout(checkFinale,900);
 }
 
 /* ---------- たべる → 成長 ---------- */
@@ -688,15 +763,23 @@ function addSegment(color){
     busy=true;
     setTimeout(()=>startStageUp(S.stageIdx+1),700);
   }else{
+    /* キングレベルアップのおいわい */
+    if(S.stageIdx===STAGES.length-1){
+      const k=S.segs.length-STAGES[STAGES.length-1].min;
+      if(k>0 && k%10===0){
+        setTimeout(()=>{ toast("👑 キングレベルアップ！ Lv."+(k/10+1)+"！",2400); confetti(50); SFX.win(); },1000);
+      }
+    }
     setTimeout(checkFinale,600);
   }
 }
 /* ---------- グランドフィナーレ判定 ---------- */
 function checkFinale(){
   if(S.finaleDone || busy || S.stageIdx<STAGES.length-1) return;
-  const fin=S.hwDef.filter(h=>h.max>0);
+  const fin=S.hwDef.filter(h=>hwModeOf(h)!=="inf");
   if(!fin.length) return;
-  if(!fin.every(h=>(S.hw[h.id]||0)>=h.max)) return;
+  const allDone=fin.every(h=> hwModeOf(h)==="rough" ? !!S.hwFin[h.id] : (S.hw[h.id]||0)>=h.max);
+  if(!allDone) return;
   busy=true;
   setTimeout(runFinale,700);
 }
@@ -707,7 +790,12 @@ function renderBars(){
   $("#meStageName").textContent=STAGES[idx].name;
   $("#rivStageName").textContent=STAGES[S.natsuoStageIdx].name;
   if(idx>=STAGES.length-1){
-    $("#meBar").style.width="100%"; $("#meBarVal").textContent="👑 キング！";
+    /* コーカサス後は「キングレベル」：10たべるごとにレベルアップして飽きさせない */
+    const base=STAGES[STAGES.length-1].min;
+    const k=Math.max(0,n-base);
+    const lv=Math.floor(k/10)+1;
+    $("#meBar").style.width=((k%10)/10*100)+"%";
+    $("#meBarVal").textContent="👑 キング Lv."+lv;
   }else{
     const cur=STAGES[idx].min, nxt=STAGES[idx+1].min;
     const p=Math.max(0,Math.min(1,(n-cur)/(nxt-cur)));
@@ -1363,14 +1451,20 @@ function dailyRowHTML(t){
     '<input class="nm" value="'+esc(t.name)+'" maxlength="14" placeholder="タスクのなまえ">'+
     '<button class="del-btn" title="けす">✖</button></div>';
 }
+function hwModeOf(h){ return h.mode || (h.max===0?"inf":"count"); }
 function hwRowHTML(h){
-  const inf=(h.max===0);
-  return '<div class="setup-row" data-id="'+esc(h.id)+'">'+
+  const mode=hwModeOf(h);
+  const showNum=(mode==="count");
+  return '<div class="setup-row" data-id="'+esc(h.id)+'" data-mode="'+mode+'">'+
     '<button class="emoji-pick">'+h.emoji+'</button>'+
     '<input class="nm" value="'+esc(h.name)+'" maxlength="14" placeholder="しゅくだいのなまえ">'+
-    '<input class="mx" type="number" min="1" max="999" value="'+(inf?10:h.max)+'"'+(inf?' disabled':'')+' title="もくひょうのかず">'+
-    '<input class="un" value="'+esc(h.unit||"かい")+'" maxlength="4" placeholder="たんい">'+
-    '<button class="inf-btn'+(inf?" on":"")+'" title="むげんモード">♾️</button>'+
+    '<span class="mode-tabs">'+
+      '<button class="mode-btn'+(mode==="count"?" on":"")+'" data-m="count" title="もくひょうのかずをきめる">🔢かず</button>'+
+      '<button class="mode-btn'+(mode==="rough"?" on":"")+'" data-m="rough" title="かぞえられないタスクむけ">👌ざっくり</button>'+
+      '<button class="mode-btn'+(mode==="inf"?" on":"")+'" data-m="inf" title="なんかいでもおせる">♾️むげん</button>'+
+    '</span>'+
+    '<input class="mx" type="number" min="1" max="999" value="'+(mode==="count"?h.max||10:10)+'" title="もくひょうのかず"'+(showNum?'':' style="display:none"')+'>'+
+    '<input class="un" value="'+esc(h.unit==="めもり"?"かい":(h.unit||"かい"))+'" maxlength="4" placeholder="たんい"'+(showNum?'':' style="display:none"')+'>'+
     '<button class="del-btn" title="けす">✖</button></div>';
 }
 function openEmojiPalette(targetBtn){
@@ -1407,9 +1501,15 @@ function showSetup(first){
     '<div class="setup-h">📅 まいにちのタスク（まいにち リセットされるよ）</div>'+
     '<div id="setDaily">'+S.tasksDef.map(dailyRowHTML).join("")+'</div>'+
     '<button class="add-btn" id="addDaily">＋ まいにちのタスクを ふやす</button>'+
-    '<div class="setup-h">📚 なつやすみのしゅくだい（もくひょうのかず と たんいも きめられる・♾️は むげん）</div>'+
+    '<div class="setup-h">📚 なつやすみのしゅくだい</div>'+
+    '<div style="font-size:12.5px;color:#8b95a0;text-align:left;margin-bottom:2px;line-height:1.7;">'+
+      '🔢<b>かず</b>：目標の数と単位を決めてカウント（例：ドリル20ページ）<br>'+
+      '👌<b>ざっくり</b>：ページ数がかぞえられないプリント集などに。やった日に「やった！」、終わったら「✅ぜんぶおわった」<br>'+
+      '<span style="font-size:11.5px;">※ざっくりの回数は「しゅくだい ぜんたい%」には入らず、✅で100%になります</span><br>'+
+      '♾️<b>むげん</b>：終わりなし。何回でも押せる（例：どくしょ）</div>'+
     '<div id="setHw">'+S.hwDef.map(hwRowHTML).join("")+'</div>'+
     '<button class="add-btn" id="addHw">＋ しゅくだいを ふやす</button>'+
+    '<button class="add-btn" id="openHelp">📖 あそびかたを みる</button>'+
     '<button class="big-btn" id="setupSave">これで スタート！</button></div>';
   ov.addEventListener("click",function handler(e){
     const row=e.target.closest(".setup-row");
@@ -1419,9 +1519,12 @@ function showSetup(first){
       if(box.children.length>1){ row.remove(); SFX.tick(); }
       else toast("さいごの1つは けせないよ！",1500);
     }
-    else if(e.target.classList.contains("inf-btn")){
-      e.target.classList.toggle("on");
-      row.querySelector(".mx").disabled=e.target.classList.contains("on");
+    else if(e.target.classList.contains("mode-btn")){
+      row.dataset.mode=e.target.dataset.m;
+      row.querySelectorAll(".mode-btn").forEach(b=>b.classList.toggle("on",b===e.target));
+      const show=(e.target.dataset.m==="count");
+      row.querySelector(".mx").style.display=show?"":"none";
+      row.querySelector(".un").style.display=show?"":"none";
       SFX.tick();
     }
   });
@@ -1432,9 +1535,10 @@ function showSetup(first){
   });
   $("#addHw").addEventListener("click",()=>{
     if($("#setHw").children.length>=10){ toast("しゅくだいは 10こまで！",1500); return; }
-    $("#setHw").insertAdjacentHTML("beforeend",hwRowHTML({id:uid("h"),name:"",emoji:EMOJIS[Math.floor(Math.random()*EMOJIS.length)],max:10,unit:"かい"}));
+    $("#setHw").insertAdjacentHTML("beforeend",hwRowHTML({id:uid("h"),name:"",emoji:EMOJIS[Math.floor(Math.random()*EMOJIS.length)],max:10,unit:"かい",mode:"count"}));
     SFX.pop();
   });
+  $("#openHelp").addEventListener("click",()=>showHelp(true));
   $("#setupSave").addEventListener("click",()=>{
     S.tasksDef=[...ov.querySelectorAll("#setDaily .setup-row")].map((r,i)=>({
       id:r.dataset.id,
@@ -1442,14 +1546,16 @@ function showSetup(first){
       emoji:r.querySelector(".emoji-pick").textContent
     }));
     S.hwDef=[...ov.querySelectorAll("#setHw .setup-row")].map((r,i)=>{
-      const inf=r.querySelector(".inf-btn").classList.contains("on");
-      const mx=inf?0:Math.min(999,Math.max(1,parseInt(r.querySelector(".mx").value,10)||1));
-      const un=(r.querySelector(".un").value.trim()||"かい").slice(0,4);
+      const mode=r.dataset.mode||"count";
+      let mx, un;
+      if(mode==="inf"){ mx=0; un=(r.querySelector(".un").value.trim()||"かい").slice(0,4); }
+      else if(mode==="rough"){ mx=10; un="めもり"; }
+      else{ mx=Math.min(999,Math.max(1,parseInt(r.querySelector(".mx").value,10)||1)); un=(r.querySelector(".un").value.trim()||"かい").slice(0,4); }
       return {
         id:r.dataset.id,
         name:(r.querySelector(".nm").value.trim()||"しゅくだい"+(i+1)).slice(0,14),
         emoji:r.querySelector(".emoji-pick").textContent,
-        max:mx, unit:un, btn:"+1"+un
+        max:mx, unit:un, btn:"+1"+un, mode:mode
       };
     });
     S.hwDef.forEach(h=>{ if(S.hw[h.id]==null) S.hw[h.id]=0; });
@@ -1458,7 +1564,9 @@ function showSetup(first){
     if(/^\d{4}-\d{2}-\d{2}$/.test(vs)) S.vacStart=vs;
     if(/^\d{4}-\d{2}-\d{2}$/.test(ve)) S.vacEnd=ve;
     if(parseYMD(S.vacEnd)<parseYMD(S.vacStart)) S.vacEnd=S.vacStart;
-    S.setupDone=true; save(); renderTasks(); renderCalendar(); SFX.pop(); closeEmojiPalette();
+    S.setupDone=true; save();
+    computeStages();   // タスク量にあわせて進化ペースを再計算
+    renderTasks(); renderCalendar(); renderBars(); SFX.pop(); closeEmojiPalette();
     ov.classList.add("hidden"); ov.innerHTML="";
     if(first) setTimeout(()=>toast("🥚 タスクをやって たまごを そだてよう！",3000),400);
   });
@@ -1466,6 +1574,43 @@ function showSetup(first){
 $("#setupBtn").addEventListener("click",()=>{
   if(busy || !$("#overlay").classList.contains("hidden")) return;
   showSetup(false);
+});
+
+/* ================= あそびかた画面 ================= */
+function showHelp(fromSetup){
+  const ov=$("#overlay"); ov.classList.remove("hidden");
+  ov.innerHTML='<div class="panel scrolly"><h2>📖 あそびかた</h2>'+
+    '<div class="help-block">🐛 <b>タスクをやったら「やった！」をおそう</b><br>'+
+    'キャラクターが たべものを たべて せいちょう！たべた いろで からだが きれいな グラデーションに なるよ。</div>'+
+    '<div class="help-block">✨ <b>そだてると… しんかする！？</b><br>'+
+    '🥚たまごから はじまって、がんばるほど <b>まさかの すがた</b>に しんかしていくよ。'+
+    'つぎに なにに なるかは… そだてての おたのしみ！</div>'+
+    '<div class="help-block">⚔️ <b>しんかのとき バトル発生！</b><br>'+
+    'ライバル「なつお」と しょうぶだ！どんな バトルかは そのときの おたのしみ。'+
+    'まけても もういちど ちょうせんできるよ。</div>'+
+    '<div class="help-block">😴 <b>なつおは おひるねずき</b><br>'+
+    'いつも ねてるけど、きみが がんばると こっそり せいちょうしてる。タップすると おきるよ。<br>'+
+    'きみも たまには おひるねして ゆっくり やすもうね。</div>'+
+    '<div class="help-block">🌻 <b>まいにちのタスクを ぜんぶやると</b> カレンダーに スタンプ！'+
+    'さいごまで そだてて しゅくだいも ぜんぶ おわらせると…🎆 ひみつの おまつりが まってるよ！</div>'+
+    '<div class="help-block" style="background:#f4fbff;">🏠 <b>おうちの方へ</b><br>'+
+    '・タスクの名前・絵文字・目標数・夏休みの期間は ⚙️ボタンでいつでも変更できます<br>'+
+    '・宿題は3タイプ：🔢数を決める（目標数と単位でカウント）／👌ざっくり（ページ数が数えられないプリント集などに。やった日に「やった！」、終わったら「✅ぜんぶおわった」で完了。回数は全体%には入りません）／♾️無限（終わりのないもの）<br>'+
+    '・進化のペースはタスクの量と期間から自動調整されます<br>'+
+    '・データはこの端末のブラウザ内にのみ保存されます（閲覧データを削除すると消えます）。<b>ブックマークして同じブラウザで開く</b>のがおすすめです<br>'+
+    '・毎日のタスクは日付が変わると自動でリセットされます<br>'+
+    '・画面右下に最初からやり直す「リセット」ボタンがあります（お子様の誤操作にご注意ください）<br>'+
+    '・コードは公開しています。ご家庭に合わせたカスタマイズも歓迎です → '+
+    '<a href="https://github.com/matsu-co/natsuyasumin" target="_blank" rel="noopener" style="color:#2a9dd6;">GitHub</a></div>'+
+    '<button class="big-btn" id="helpBack">'+(fromSetup?"せっていに もどる":"とじる")+'</button></div>';
+  $("#helpBack").addEventListener("click",()=>{
+    if(fromSetup){ showSetup(!S.setupDone); }
+    else{ ov.classList.add("hidden"); ov.innerHTML=""; }
+  });
+}
+$("#helpBtn").addEventListener("click",()=>{
+  if(busy || !$("#overlay").classList.contains("hidden")) return;
+  showHelp(false);
 });
 
 /* ================= 起動 ================= */
