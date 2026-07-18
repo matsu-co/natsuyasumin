@@ -1618,12 +1618,12 @@ function showSetup(first){
     }
   });
   $("#addDaily").addEventListener("click",()=>{
-    if($("#setDaily").children.length>=10){ toast("タスクは 10こまで！",1500); return; }
+    if($("#setDaily").children.length>=20){ toast("タスクは 20こまで！",1500); return; }
     $("#setDaily").insertAdjacentHTML("beforeend",dailyRowHTML({id:uid("d"),name:"",emoji:EMOJIS[Math.floor(Math.random()*EMOJIS.length)]}));
     SFX.pop();
   });
   $("#addHw").addEventListener("click",()=>{
-    if($("#setHw").children.length>=10){ toast("しゅくだいは 10こまで！",1500); return; }
+    if($("#setHw").children.length>=20){ toast("しゅくだいは 20こまで！",1500); return; }
     $("#setHw").insertAdjacentHTML("beforeend",hwRowHTML({id:uid("h"),name:"",emoji:EMOJIS[Math.floor(Math.random()*EMOJIS.length)],max:10,unit:"かい",mode:"count"}));
     SFX.pop();
   });
