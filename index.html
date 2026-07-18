@@ -1107,6 +1107,7 @@ setInterval(()=>{
 function startStageUp(newIdx){
   if(newIdx===1){ showEvolution(newIdx); return; }   // ふ化はバトルなし
   S.battles++;
+  revenge=false;
   const type=["race","leaf","jump"][(S.battles-1)%3];
   showBattleIntro(type, S.battles, newIdx);
 }
@@ -1164,15 +1165,19 @@ function miniCreature(stageIdx, colors, recent, gid, w){
 function miniMe(gid,w){ return miniCreature(S.stageIdx, S.segs, S.segs.slice(S.evoAt), gid, w); }
 function miniRiv(gid,w){ return miniCreature(S.natsuoStageIdx, S.natsuoSegs, S.natsuoSegs.slice(S.natsuoEvoAt), gid, w); }
 let battleTimers=[], battleRaf=0;
+let revenge=false;   // 初戦（なつおが勝つ）のあとのリベンジマッチ中か
 function bTimeout(fn,ms){ battleTimers.push(setTimeout(fn,ms)); }
 function clearBattle(){ battleTimers.forEach(clearTimeout); battleTimers=[]; cancelAnimationFrame(battleRaf); }
 
 function showBattleIntro(type, battleNo, newIdx){
   const ov=$("#overlay"); ov.classList.remove("hidden");
   const m=BATTLE_META[type];
+  const rev=(battleNo===1 && revenge);
   ov.innerHTML='<div class="panel">'+
-    '<h2>⚔️ バトル発生！ '+m.title+'</h2>'+
-    '<div class="desc">レベルアップのちからだめし！なつおが「やるときは やるよ〜」と おきてきた！<br>'+m.desc+'</div>'+
+    '<h2>'+(rev?"🔥 リベンジマッチ！ ":"⚔️ バトル発生！ ")+m.title+'</h2>'+
+    '<div class="desc">'+(rev
+      ?'なつお「え、もういっかい やるの…？ もう ねむいんだけど…」<br>ねむそうな いまが チャンス！こんどこそ かとう！'
+      :'レベルアップのちからだめし！なつおが「やるときは やるよ〜」と おきてきた！<br>'+m.desc)+'</div>'+
     '<div style="display:flex;justify-content:center;gap:40px;align-items:flex-end;margin:6px 0;">'+
       '<div>'+miniMe("gBm",110)+'<div style="font-weight:900;color:#e2574c">きみ</div></div>'+
       '<div style="font-size:30px;font-weight:900;color:#ff9f43;padding-bottom:30px;">VS</div>'+
@@ -1223,8 +1228,9 @@ function runRace(battleNo,newIdx){
     running=true; btn.disabled=false; btn.style.opacity="1";
     me.classList.add("run-anim"); riv.classList.add("run-anim");
     let last=performance.now();
-    // なつおの作戦
-    if(battleNo!==1){
+    // なつおの作戦（初戦だけ本気。リベンジ以降は昼寝グセが出る）
+    const scripted=(battleNo===1 && !revenge);
+    if(!scripted){
       bTimeout(()=>{ napping=true; riv.classList.remove("run-anim");
         speech(box,(rivPos+4)+"%","44%","ちょっと きゅうけい…zzz",3200); },2800);
       bTimeout(()=>{ napping=false; riv.classList.add("run-anim");
@@ -1235,10 +1241,10 @@ function runRace(battleNo,newIdx){
       const dt=Math.min((now-last)/1000,0.05); last=now;
       mePos+=meV*dt; meV*=Math.exp(-2.4*dt);
       if(meV<2) me.classList.remove("run-anim");
-      let rv = battleNo===1 ? 13 : 10;
+      let rv = scripted ? 13 : 10;
       if(napping) rv=0;
       rivPos+=rv*dt;
-      if(battleNo===1 && mePos>48){
+      if(scripted && mePos>48){
         if(!dashed){ dashed=true; speech(box,(rivPos+4)+"%","44%","まさかの ほんき！！",2000); SFX.go(); }
         rivPos=Math.max(rivPos, mePos+4);   // 初回はぜったい勝てない
       }
@@ -1376,26 +1382,34 @@ function finishBattle(win, battleNo, newIdx, type){
   clearBattle();
   const ov=$("#overlay");
   if(win){
+    const rev=(battleNo===1 && revenge);
     S.score.me++; save(); SFX.win(); confetti(80);
-    ov.innerHTML='<div class="panel"><h2 style="font-size:34px;">🏆 きみの かち！！</h2>'+
+    ov.innerHTML='<div class="panel"><h2 style="font-size:34px;">'+(rev?"🔥 リベンジ せいこう！！":"🏆 きみの かち！！")+'</h2>'+
       '<div style="font-size:60px; margin:6px 0;">🎉😆🎉</div>'+
-      '<div class="desc">なつお「つ、つよすぎる…！ ボクは ねる…」<br>しょうりの ちからで しんかが はじまる！！</div>'+
+      '<div class="desc">'+(rev
+        ?'なつお「ええーっ！？ さっきの ほんきは どこに…zzz」<br>やったね！しょうりの ちからで しんかが はじまる！！'
+        :'なつお「つ、つよすぎる…！ ボクは ねる…」<br>しょうりの ちからで しんかが はじまる！！')+'</div>'+
       '<button class="big-btn" id="nextBtn">しんかへ！</button></div>';
-    $("#nextBtn").addEventListener("click",()=>{ renderBars(); showEvolution(newIdx); });
-  }else if(battleNo===1){
+    $("#nextBtn").addEventListener("click",()=>{ revenge=false; renderBars(); showEvolution(newIdx); });
+  }else if(battleNo===1 && !revenge){
     S.score.riv++; save(); SFX.lose();
     ov.innerHTML='<div class="panel"><h2 style="color:#7b6cd9;">😲 なつおの かち…！</h2>'+
       '<div style="font-size:60px; margin:6px 0;">😪🏅</div>'+
-      '<div class="desc">なつお「やるときは やるんだよ〜。じゃ、おやすみ…zzz」<br>くやしい〜！！ でも きみの からだは たしかに つよくなってる…！</div>'+
-      '<button class="big-btn blue" id="nextBtn">つぎは まけないぞ！</button></div>';
+      '<div class="desc">なつお「やるときは やるんだよ〜。じゃ、おやすみ…zzz」<br>くやしい〜！！ このまま ねかせて おくもんか！</div>'+
+      '<button class="big-btn" id="revBtn">🔥 リベンジだ！！</button>'+
+      '<button class="big-btn blue" id="nextBtn">くやしいけど つぎへ</button></div>';
+    $("#revBtn").addEventListener("click",()=>{ revenge=true; SFX.go(); showBattleIntro(type, battleNo, newIdx); });
     $("#nextBtn").addEventListener("click",()=>{ renderBars(); showEvolution(newIdx); });
   }else{
     SFX.lose();
+    const canSkip=(battleNo===1);   // リベンジに失敗しても進化はできる
     ov.innerHTML='<div class="panel"><h2 style="color:#4aa3ff;">おしい〜！！</h2>'+
       '<div style="font-size:56px; margin:6px 0;">💦🐛💦</div>'+
       '<div class="desc">あとちょっとだった！ もういちど ちょうせんだ！<br>（なつおは まちくたびれて あくびしてる…いまが チャンス！）</div>'+
-      '<button class="big-btn" id="retryBtn">もういちど！</button></div>';
+      '<button class="big-btn" id="retryBtn">もういちど！</button>'+
+      (canSkip?'<button class="big-btn blue" id="skipBtn">つぎへ</button>':"")+'</div>';
     $("#retryBtn").addEventListener("click",()=>showBattleIntro(type, battleNo, newIdx));
+    if(canSkip) $("#skipBtn").addEventListener("click",()=>{ revenge=false; renderBars(); showEvolution(newIdx); });
   }
 }
 
